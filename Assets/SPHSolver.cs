@@ -1,22 +1,38 @@
 using System.Collections.Generic;
+using System.Numerics;
 using UnityEngine;
 using UnityEngine.Rendering;
 using Vector2 = UnityEngine.Vector2;
 using Vector3 = UnityEngine.Vector3;
+using Quaternion = UnityEngine.Quaternion;
+using Unity.VisualScripting;
+using UnityEngine.UIElements;
+using UnityEngine.Timeline;
 
 public class SPHSolver : MonoBehaviour
 {
+    private LineRenderer lr;
+
+    public float gravitiy;
+
+    public Vector2 BoundsSize; 
+    public float CollisionDamping; 
+
     private List<FluidParticle> particles = new List<FluidParticle>(); // Dynamic list 
     public GameObject particlePrefab;
-    public int MaxParticles; 
     public float particleRadius = 0.2f;
 
-    // --- Spawning ---
-    public Vector2 spawnPos = new Vector2(0,3);  // Center of the spawn region 
-    public Vector2 spawnArea = new Vector2(2,2);  // Width and height of the spawn area 
-    public float spawnSpacing = 0.3f;  // Distance between spawned particles
-
-    public float dt = 0.01f;
+    void Awake()
+    {
+        // -- Created the GameObject for visualizing the collision box --
+        lr = gameObject.AddComponent<LineRenderer>();
+        lr.loop = true;
+        lr.widthMultiplier = 0.05f;
+        lr.positionCount = 4;
+        lr.useWorldSpace = false;
+        lr.startColor = Color.white;
+        lr.endColor = Color.white;
+    }
 
     void Start()
     {
@@ -27,15 +43,17 @@ public class SPHSolver : MonoBehaviour
     {
         foreach (var p in particles)
         {
-            p.force = new Vector2(0, -9.81f);  // Apply gravity 
 
-            p.velocity += p.force * dt;
+            p.force = new Vector2(0, -gravitiy);  // Apply gravity 
 
-            p.position += p.velocity * dt;
+            p.velocity += p.force * Time.deltaTime;
+
+            p.position += p.velocity * Time.deltaTime;
+
+            ResolveCollisions(p);
         }
     }
 
-    // -- Spawns a grid of particles --
     void SpawnInitialParticles()
     {
         if (particlePrefab == null)
@@ -44,31 +62,15 @@ public class SPHSolver : MonoBehaviour
             return;
         }
 
-        // Calculates inital spawn corner 
-        Vector2 startPos = spawnPos - spawnArea * 0.5f;
-        int spawnedCount = 0;
-
-        for (float x = 0; x < spawnArea.x && spawnedCount < MaxParticles; x += spawnSpacing)
-        {
-            for (float y = 0; y < spawnArea.y && spawnedCount < MaxParticles; y += spawnSpacing)
-            {
-                Vector2 pos = startPos + new Vector2(x,y);
-                
-                SpawnParticle(pos);
-                spawnedCount++;
-
-            }
-        }
-
-        Debug.Log($"Spawned {particles.Count} SPH particles");
+        Vector2 InitialPos = new Vector2(0,0);
+        SpawnParticle(InitialPos);
+        
     }
 
    // -- Spawn a single particle-- 
     public void SpawnParticle(Vector2 position)
     {
-        // Limit check 
-        if (particles.Count >= MaxParticles) return;
-
+        
         GameObject obj = Instantiate(particlePrefab, new Vector3 (position.x, position.y, 0), Quaternion.identity, transform);
         // Set diameter = radius x 2
         obj.transform.localScale = Vector3.one * particleRadius * 2;
@@ -81,5 +83,44 @@ public class SPHSolver : MonoBehaviour
 
         particle.velocity = Vector2.zero;
         particles.Add(particle);
+    }
+
+    void ResolveCollisions(FluidParticle p)
+    {
+        UpdateCollisionBox();
+        Vector2 halfBoundsSize = BoundsSize / 2 - Vector2.one * particleRadius;
+        Vector2 pos = p.position;
+        Vector2 vel = p.velocity;
+
+
+        // Limits & apply collision damping 
+        if (Mathf.Abs(pos.x) > halfBoundsSize.x)
+        {
+            pos.x = halfBoundsSize.x * Mathf.Sign(pos.x);
+            vel.x *= -1 * CollisionDamping;
+        }
+        if (Mathf.Abs(pos.y) > halfBoundsSize.y)
+        {
+            pos.y = halfBoundsSize.y * Mathf.Sign(pos.y);
+            vel.y *= -1 * CollisionDamping;
+        }
+
+        p.position = pos;
+        p.velocity = vel;
+    }
+
+    void UpdateCollisionBox()
+    {
+        Vector2 half = BoundsSize / 2f;
+
+        Vector3[] corners =
+        {
+            new Vector3(-half.x, -half.y, 0),
+            new Vector3(-half.x,  half.y, 0),
+            new Vector3( half.x,  half.y, 0),
+            new Vector3( half.x, -half.y, 0)
+        };
+
+        lr.SetPositions(corners);
     }
 }
