@@ -240,7 +240,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SPHSolver
   gravitiy: 9
   BoundsSize: {x: 10, y: 9}
-  CollisionDamping: 1
+  CollisionDamping: 0.5
   particlePrefab: {fileID: 7872402013042043730, guid: 75c90f8d300e2db41b3f2077a0ccf771, type: 3}
   particleRadius: 0.2
 --- !u!4 &1062462780

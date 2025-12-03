@@ -8,6 +8,7 @@ using Quaternion = UnityEngine.Quaternion;
 using Unity.VisualScripting;
 using UnityEngine.UIElements;
 using UnityEngine.Timeline;
+using System;
 
 public class SPHSolver : MonoBehaviour
 {
@@ -19,8 +20,10 @@ public class SPHSolver : MonoBehaviour
     public float CollisionDamping; 
 
     private List<FluidParticle> particles = new List<FluidParticle>(); // Dynamic list 
+    public int numParticles; 
     public GameObject particlePrefab;
     public float particleRadius = 0.2f;
+    public float particleSpacing;
 
     void Awake()
     {
@@ -62,8 +65,21 @@ public class SPHSolver : MonoBehaviour
             return;
         }
 
-        Vector2 InitialPos = new Vector2(0,0);
-        SpawnParticle(InitialPos);
+        int particlesPerRow = (int)Math.Sqrt(numParticles);
+        //int particlesPerCol = (numParticles - 1) / particlesPerRow + 1;
+        float spacing = particleRadius * 2 + particleSpacing; 
+
+        for (int i = 0; i < numParticles; i++)
+        {
+            int row = i / particlesPerRow;
+            int col = i % particlesPerRow;
+
+            float x = (col - particlesPerRow / 2f) * spacing;
+            float y = (row - particlesPerRow / 2f ) * spacing;
+
+            SpawnParticle(new Vector2(x,y)); 
+            Debug.Log(i);
+        }
         
     }
 
