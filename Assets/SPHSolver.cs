@@ -12,10 +12,9 @@ using System;
 
 public class SPHSolver : MonoBehaviour
 {
-    private LineRenderer lr;
-
     public float gravitiy;
 
+    private LineRenderer lr;
     public Vector2 BoundsSize; 
     public float CollisionDamping; 
 
@@ -44,6 +43,7 @@ public class SPHSolver : MonoBehaviour
 
     void Update()
     {
+        //SpawnInitialParticles();
         foreach (var p in particles)
         {
 
@@ -51,7 +51,7 @@ public class SPHSolver : MonoBehaviour
 
             p.velocity += p.force * Time.deltaTime;
 
-            p.position += p.velocity * Time.deltaTime;
+            //p.position += p.velocity * Time.deltaTime;
 
             ResolveCollisions(p);
         }
@@ -66,7 +66,6 @@ public class SPHSolver : MonoBehaviour
         }
 
         int particlesPerRow = (int)Math.Sqrt(numParticles);
-        //int particlesPerCol = (numParticles - 1) / particlesPerRow + 1;
         float spacing = particleRadius * 2 + particleSpacing; 
 
         for (int i = 0; i < numParticles; i++)
@@ -107,7 +106,6 @@ public class SPHSolver : MonoBehaviour
         Vector2 halfBoundsSize = BoundsSize / 2 - Vector2.one * particleRadius;
         Vector2 pos = p.position;
         Vector2 vel = p.velocity;
-
 
         // Limits & apply collision damping 
         if (Mathf.Abs(pos.x) > halfBoundsSize.x)
