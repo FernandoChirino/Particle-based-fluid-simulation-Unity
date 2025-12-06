@@ -239,9 +239,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SPHSolver
   gravitiy: 9
-  BoundsSize: {x: 63, y: 36}
+  smoothingRadius: 2
+  BoundsSize: {x: 65, y: 37}
   CollisionDamping: 0.5
-  numParticles: 250
+  numParticles: 500
   particlePrefab: {fileID: 7872402013042043730, guid: 75c90f8d300e2db41b3f2077a0ccf771, type: 3}
   particleRadius: 0.2
   particleSpacing: 0.3

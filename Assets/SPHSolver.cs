@@ -10,10 +10,14 @@ using UnityEngine.UIElements;
 using UnityEngine.Timeline;
 using System;
 using Random = UnityEngine.Random;
+using Unity.Mathematics;
 
 public class SPHSolver : MonoBehaviour
 {
     public float gravitiy;
+    public float smoothingRadius = 2.0f;
+    private float particleMass = 1.0f;
+    //private float targetDensity = 1.0f;
 
     private LineRenderer lr;
     public Vector2 BoundsSize; 
@@ -40,11 +44,14 @@ public class SPHSolver : MonoBehaviour
     void Start()
     {
         SpawnInitialParticles();
+
     }
 
     void Update()
     {
-        //SpawnInitialParticles();
+
+        CalculateDensities();
+
         foreach (var p in particles)
         {
 
@@ -141,5 +148,31 @@ public class SPHSolver : MonoBehaviour
         };
 
         lr.SetPositions(corners);
+    }
+
+    void CalculateDensities()
+    {
+        foreach (var pA in particles)
+        {
+            float density = 0f;
+
+            foreach(var pB in particles)
+            {
+                float distance = Vector2.Distance(pA.position, pB.position);
+                float influence = SmoothingKernel(smoothingRadius, distance);
+                density += particleMass * influence;
+            }
+            
+            pA.density = density;
+        }
+    }
+
+    float SmoothingKernel(float radius, float distance)
+    {
+        if (distance >= radius) return 0f;
+        
+        float volume = (Mathf.PI * Mathf.Pow(radius, 4)) / 6f;
+        float value = Mathf.Max(0, radius * radius - distance * distance);
+        return value * value * value / volume;
     }
 }
