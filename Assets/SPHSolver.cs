@@ -9,6 +9,7 @@ using Unity.VisualScripting;
 using UnityEngine.UIElements;
 using UnityEngine.Timeline;
 using System;
+using Random = UnityEngine.Random;
 
 public class SPHSolver : MonoBehaviour
 {
@@ -31,7 +32,7 @@ public class SPHSolver : MonoBehaviour
         lr.loop = true;
         lr.widthMultiplier = 0.05f;
         lr.positionCount = 4;
-        lr.useWorldSpace = false;
+        lr.useWorldSpace = true;
         lr.startColor = Color.white;
         lr.endColor = Color.white;
     }
@@ -49,9 +50,10 @@ public class SPHSolver : MonoBehaviour
 
             p.force = new Vector2(0, -gravitiy);  // Apply gravity 
 
-            p.velocity += p.force * Time.deltaTime;
+            //p.velocity += p.force * Time.deltaTime;
+            p.velocity += Vector2.zero * Time.deltaTime;
 
-            //p.position += p.velocity * Time.deltaTime;
+            p.position += p.velocity * Time.deltaTime;
 
             ResolveCollisions(p);
         }
@@ -73,11 +75,13 @@ public class SPHSolver : MonoBehaviour
             int row = i / particlesPerRow;
             int col = i % particlesPerRow;
 
-            float x = (col - particlesPerRow / 2f) * spacing;
-            float y = (row - particlesPerRow / 2f ) * spacing;
+            //float x = (col - particlesPerRow / 2f) * spacing;
+            //float y = (row - particlesPerRow / 2f ) * spacing;
+            float x = Random.Range(-30,30);
+            float y = Random.Range(-15,15);
 
             SpawnParticle(new Vector2(x,y)); 
-            Debug.Log(i);
+            Debug.Log(i + "position:" + "x:" + x + "y" + y);
         }
         
     }
@@ -109,13 +113,14 @@ public class SPHSolver : MonoBehaviour
 
         // Limits & apply collision damping 
         if (Mathf.Abs(pos.x) > halfBoundsSize.x)
-        {
-            pos.x = halfBoundsSize.x * Mathf.Sign(pos.x);
+        {   
+            Debug.Log($"X Collision! pos.x={pos.x}, halfBounds={halfBoundsSize.x}");
+            pos.x = Math.Clamp(pos.x, -halfBoundsSize.x, halfBoundsSize.x);
             vel.x *= -1 * CollisionDamping;
         }
         if (Mathf.Abs(pos.y) > halfBoundsSize.y)
         {
-            pos.y = halfBoundsSize.y * Mathf.Sign(pos.y);
+            pos.y = Math.Clamp(pos.y, -halfBoundsSize.y, halfBoundsSize.y);
             vel.y *= -1 * CollisionDamping;
         }
 

@@ -203,8 +203,8 @@ Transform:
   m_GameObject: {fileID: 966980144}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.40255356, y: 5.8559284, z: 1}
-  m_LocalScale: {x: 83.002396, y: 47.000202, z: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 1}
+  m_LocalScale: {x: 100, y: 47.000202, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -239,9 +239,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SPHSolver
   gravitiy: 9
-  BoundsSize: {x: 10, y: 9}
+  BoundsSize: {x: 63, y: 36}
   CollisionDamping: 0.5
-  numParticles: 10
+  numParticles: 250
   particlePrefab: {fileID: 7872402013042043730, guid: 75c90f8d300e2db41b3f2077a0ccf771, type: 3}
   particleRadius: 0.2
   particleSpacing: 0.3
@@ -366,7 +366,7 @@ Camera:
   far clip plane: 1000
   field of view: 60
   orthographic: 1
-  orthographic size: 8.782293
+  orthographic size: 19
   m_Depth: 0
   m_CullingMask:
     serializedVersion: 2
