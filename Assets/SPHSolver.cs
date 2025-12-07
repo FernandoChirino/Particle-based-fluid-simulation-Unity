@@ -37,6 +37,8 @@ public class SPHSolver : MonoBehaviour
         lr.widthMultiplier = 0.05f;
         lr.positionCount = 4;
         lr.useWorldSpace = true;
+        Material defaulLineMaterial= new Material(Shader.Find("Legacy Shaders/Particles/Alpha Blended Premultiply"));
+        lr.material = defaulLineMaterial;
         lr.startColor = Color.white;
         lr.endColor = Color.white;
     }
