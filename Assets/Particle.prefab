@@ -108,4 +108,4 @@ MonoBehaviour:
   density: 0
   pressure: 0
   mass: 0
-  smoothingRadius: 0
+  smoothingRadius: 3.78

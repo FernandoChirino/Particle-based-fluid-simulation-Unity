@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEditor;
 
 public class FluidParticle : MonoBehaviour
 {
@@ -7,7 +8,7 @@ public class FluidParticle : MonoBehaviour
     public float density;
     public float pressure; 
     public float mass;
-    public float smoothingRadius;
+    
 
     public Vector2 position
     {
@@ -25,5 +26,21 @@ public class FluidParticle : MonoBehaviour
     void Update()
     {
         
+    }
+
+    void OnDrawGizmos()
+    {
+        float smoothingRadius = SPHSolver.Instance.smoothingRadius;
+        // Outer faint “blur”
+        Handles.color = new Color(0f, 0.5f, 1f, 0.08f);
+        Handles.DrawSolidDisc(transform.position, Vector3.back, smoothingRadius);
+
+        // Middle stronger layer
+        Handles.color = new Color(0f, 0.5f, 1f, 0.12f);
+        Handles.DrawSolidDisc(transform.position, Vector3.back, smoothingRadius * 0.6f);
+
+        // Inner core
+        Handles.color = new Color(0f, 0.5f, 1f, 0.2f);
+        Handles.DrawSolidDisc(transform.position, Vector3.back, smoothingRadius * 0.3f);
     }
 }

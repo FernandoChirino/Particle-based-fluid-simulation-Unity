@@ -29,6 +29,8 @@ public class SPHSolver : MonoBehaviour
     public float particleRadius = 0.2f;
     public float particleSpacing;
 
+    public static SPHSolver Instance;
+
     void Awake()
     {
         // -- Created the GameObject for visualizing the collision box --
@@ -41,6 +43,8 @@ public class SPHSolver : MonoBehaviour
         lr.material = defaulLineMaterial;
         lr.startColor = Color.white;
         lr.endColor = Color.white;
+
+        Instance = this; 
     }
 
     void Start()
@@ -177,4 +181,14 @@ public class SPHSolver : MonoBehaviour
         float value = Mathf.Max(0, radius * radius - distance * distance);
         return value * value * value / volume;
     }
+
+    // void OnDrawGizmos()
+    // {
+    //     Gizmos.color = Color.cyan;
+        
+    //     foreach(var p in particles)
+    //     {
+    //         Gizmos.DrawWireSphere(p.position, smoothingRadius);
+    //     }
+    // }
 }
