@@ -11,13 +11,17 @@ using UnityEngine.Timeline;
 using System;
 using Random = UnityEngine.Random;
 using Unity.Mathematics;
+using Unity.Properties;
+using System.Linq.Expressions;
+using System.Transactions;
 
 public class SPHSolver : MonoBehaviour
 {
     public float gravitiy;
     public float smoothingRadius = 2.0f;
     private float particleMass = 1.0f;
-    //private float targetDensity = 1.0f;
+    public float targetDensity;
+    public float pressureMultiplier;
 
     private LineRenderer lr;
     public Vector2 BoundsSize; 
@@ -61,10 +65,11 @@ public class SPHSolver : MonoBehaviour
         foreach (var p in particles)
         {
 
-            p.force = new Vector2(0, -gravitiy);  // Apply gravity 
+            Vector2 pressureForce = CalculatePressureForce(p);
+            Vector2 pressureAcceleration = pressureForce / p.density;
 
-            //p.velocity += p.force * Time.deltaTime;
-            p.velocity += Vector2.zero * Time.deltaTime;
+            Vector2 gravity = new Vector2(0, -gravitiy);  // Apply gravity 
+            p.velocity += (gravity + pressureAcceleration) * Time.deltaTime;
 
             p.position += p.velocity * Time.deltaTime;
 
@@ -88,10 +93,10 @@ public class SPHSolver : MonoBehaviour
             int row = i / particlesPerRow;
             int col = i % particlesPerRow;
 
-            //float x = (col - particlesPerRow / 2f) * spacing;
-            //float y = (row - particlesPerRow / 2f ) * spacing;
-            float x = Random.Range(-30,30);
-            float y = Random.Range(-15,15);
+            float x = (col - particlesPerRow / 2f) * spacing;
+            float y = (row - particlesPerRow / 2f ) * spacing;
+            // float x = Random.Range(-15,15);
+            // float y = Random.Range(-12,12);
 
             SpawnParticle(new Vector2(x,y)); 
             Debug.Log(i + "position:" + "x:" + x + "y" + y);
@@ -176,19 +181,94 @@ public class SPHSolver : MonoBehaviour
     float SmoothingKernel(float radius, float distance)
     {
         if (distance >= radius) return 0f;
-        
-        float volume = (Mathf.PI * Mathf.Pow(radius, 4)) / 6f;
-        float value = Mathf.Max(0, radius * radius - distance * distance);
-        return value * value * value / volume;
+    
+        float volume =  (Mathf.PI * Mathf.Pow(radius, 4)) / 6f;
+        return (radius - distance) * (radius - distance) / volume;
     }
 
-    // void OnDrawGizmos()
-    // {
-    //     Gizmos.color = Color.cyan;
+    float SmoothingKernelDerivative(float radius, float distance)
+    {
+        if (distance >= radius) return 0f;
+
+        float scale = 12 / (Mathf.Pow(radius, 4) * Mathf.PI);
+        return (distance - radius) * scale;
+    }
+
+    float CalculateProperty(Vector2 samplePoint, System.Func<FluidParticle, float> getter)
+    {
+        float property = 0;
+
+        foreach(var p in particles)
+        {
+            float distance = (p.position - samplePoint).magnitude;
+            float influence = SmoothingKernel(smoothingRadius, distance);
+            float density = p.density;
+            if (density > 0)
+            {
+                property += getter(p) * influence * particleMass / density;
+            }
+        }
+
+        return property;
+    }
+
+    Vector2 CalculatePressureForce(FluidParticle p)
+    {
+        Vector2 pressureForce = Vector2.zero;
+
+        foreach (var otherParticle in particles)
+        {
+            if (p == otherParticle) continue;  // Skip self
         
-    //     foreach(var p in particles)
-    //     {
-    //         Gizmos.DrawWireSphere(p.position, smoothingRadius);
-    //     }
-    // }
+            float distance = Vector2.Distance(p.position, otherParticle.position);
+
+            if (distance > 0 && otherParticle.density > 0)
+            {
+                Vector2 direction = (otherParticle.position - p.position) / distance;
+                float slope = SmoothingKernelDerivative(smoothingRadius, distance);
+                
+                // Use SHARED pressure between the two particles
+                float sharedPressure = (ConvertDensityToPressure(p.density) + ConvertDensityToPressure(otherParticle.density)) / 2f;
+                
+                pressureForce += sharedPressure * direction * slope * particleMass / otherParticle.density;
+            }
+            else if(distance == 0)
+            {
+                Vector2 dirrection = UnityEngine.Random.insideUnitCircle.normalized;
+                pressureForce += dirrection * 0.0001f;
+            }
+        }
+        return pressureForce;
+    }
+
+    float ConvertDensityToPressure(float density)
+    {
+        float densityErr = density - targetDensity;
+        float pressure = densityErr * pressureMultiplier;
+        return pressure;
+    }
+
+    void OnDrawGizmos()
+    {
+        if (particles == null || particles.Count == 0) return;
+        
+        foreach(var p in particles)
+        {
+            // Color based on density
+            float densityRatio = p.density / targetDensity;
+            
+            if (densityRatio < 1.0f)
+            {
+                Gizmos.color = Color.Lerp(Color.blue, Color.green, densityRatio);
+            }
+            else
+            {
+                Gizmos.color = Color.Lerp(Color.green, Color.red, Mathf.Min(densityRatio - 1.0f, 1.0f));
+            }
+            
+            Gizmos.DrawWireSphere(p.position, particleRadius * 2);
+            // Gizmos.color = Color.cyan;
+            // Gizmos.DrawWireSphere(p.position, smoothingRadius);
+        }
+    }
 }

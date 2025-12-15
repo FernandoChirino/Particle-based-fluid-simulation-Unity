@@ -238,13 +238,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a9e49d415dc811f42bfccb0f6f6f359f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SPHSolver
-  gravitiy: 9
-  smoothingRadius: 1
-  BoundsSize: {x: 65, y: 37}
-  CollisionDamping: 0.5
-  numParticles: 1
+  gravitiy: 0
+  smoothingRadius: 2
+  targetDensity: 2
+  pressureMultiplier: 10
+  BoundsSize: {x: 23.9, y: 17.1}
+  CollisionDamping: 0.7
+  numParticles: 200
   particlePrefab: {fileID: 7872402013042043730, guid: 75c90f8d300e2db41b3f2077a0ccf771, type: 3}
-  particleRadius: 0.8
+  particleRadius: 0.2
   particleSpacing: 0.3
 --- !u!4 &1062462780
 Transform:
