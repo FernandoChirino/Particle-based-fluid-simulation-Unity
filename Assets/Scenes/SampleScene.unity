@@ -238,16 +238,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a9e49d415dc811f42bfccb0f6f6f359f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SPHSolver
-  gravitiy: 0
-  smoothingRadius: 2
+  gravitiy: 10
+  smoothingRadius: 1.5
   targetDensity: 2
-  pressureMultiplier: 10
-  BoundsSize: {x: 23.9, y: 17.1}
-  CollisionDamping: 0.7
-  numParticles: 200
+  pressureMultiplier: 110
+  viscosityStrength: 0.8
+  BoundsSize: {x: 40, y: 35}
+  CollisionDamping: 0.1
+  numParticles: 1500
   particlePrefab: {fileID: 7872402013042043730, guid: 75c90f8d300e2db41b3f2077a0ccf771, type: 3}
   particleRadius: 0.2
-  particleSpacing: 0.3
+  particleSpacing: 0.2
+  maxSpeed: 10
 --- !u!4 &1062462780
 Transform:
   m_ObjectHideFlags: 0
@@ -369,7 +371,7 @@ Camera:
   far clip plane: 1000
   field of view: 60
   orthographic: 1
-  orthographic size: 19
+  orthographic size: 18.99
   m_Depth: 0
   m_CullingMask:
     serializedVersion: 2
@@ -395,8 +397,8 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: -10}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 3.16, y: 1, z: 1}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}

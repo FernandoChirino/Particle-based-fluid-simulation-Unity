@@ -1,37 +1,54 @@
 using System.Collections.Generic;
-using System.Numerics;
 using UnityEngine;
-using UnityEngine.Rendering;
 using Vector2 = UnityEngine.Vector2;
 using Vector3 = UnityEngine.Vector3;
 using Quaternion = UnityEngine.Quaternion;
-using Unity.VisualScripting;
-using UnityEngine.UIElements;
-using UnityEngine.Timeline;
 using System;
-using Random = UnityEngine.Random;
-using Unity.Mathematics;
-using Unity.Properties;
-using System.Linq.Expressions;
-using System.Transactions;
 
 public class SPHSolver : MonoBehaviour
 {
+    [Header("Simulation Parameters")]
     public float gravitiy;
     public float smoothingRadius = 2.0f;
-    private float particleMass = 1.0f;
     public float targetDensity;
     public float pressureMultiplier;
+    public float viscosityStrength = 0.05f;
+    private float particleMass = 1.0f;
 
-    private LineRenderer lr;
+    [Header("Collision")]
     public Vector2 BoundsSize; 
     public float CollisionDamping; 
+    private LineRenderer lr;
 
-    private List<FluidParticle> particles = new List<FluidParticle>(); // Dynamic list 
+    [Header("Particle Setup")]
     public int numParticles; 
     public GameObject particlePrefab;
     public float particleRadius = 0.2f;
     public float particleSpacing;
+    public float maxSpeed = 10f;
+    private List<FluidParticle> particles = new List<FluidParticle>(); // Dynamic list 
+
+    private struct SpatialEntry
+    {
+        public int particleIndex;
+        public uint cellKey;
+    }
+       
+    private SpatialEntry[] spatialLookup;
+    private int[] startIndices;
+    private Vector2[] predictedPositions;
+    private readonly int[] cellOffsets = new int[]
+    {
+        -1, -1,  // bottom-left
+        -1,  0,  // left
+        -1,  1,  // top-left
+         0, -1,  // bottom
+         0,  0,  // center
+         0,  1,  // top
+         1, -1,  // bottom-right
+         1,  0,  // right
+         1,  1   // top-right
+    };
 
     public static SPHSolver Instance;
 
@@ -54,26 +71,139 @@ public class SPHSolver : MonoBehaviour
     void Start()
     {
         SpawnInitialParticles();
-
+        InitializeSpatialHashing();
     }
 
     void Update()
     {
 
+        // Apply gravity and predict next positions (look ahead)
+        for (int i = 0; i < particles.Count; i++)
+        {
+            Vector2 gravity = new Vector2(0, -gravitiy);
+            particles[i].velocity += gravity * Time.deltaTime;
+            predictedPositions[i] = particles[i].position + particles[i].velocity * Time.deltaTime / 120f;
+        }
+
+        // Update spatial lookup with predicted positions
+        UpdateSpatialLookup(predictedPositions);
+
+        // Calculate densities using predicted positions
         CalculateDensities();
 
-        foreach (var p in particles)
+        for (int i = 0; i < particles.Count; i++)
         {
+            Vector2 pressureForce = CalculatePressureForce(i);
+            Vector2 viscosityForce = CalculateViscosityForce(i);
 
-            Vector2 pressureForce = CalculatePressureForce(p);
-            Vector2 pressureAcceleration = pressureForce / p.density;
+            Vector2 Acceleration = (pressureForce + viscosityForce) / particles[i].density;
+            particles[i].velocity += Acceleration * Time.deltaTime;
 
-            Vector2 gravity = new Vector2(0, -gravitiy);  // Apply gravity 
-            p.velocity += (gravity + pressureAcceleration) * Time.deltaTime;
+            // Limit max speed
+            float speed = particles[i].velocity.magnitude;
+            if (speed > maxSpeed)
+            {
+                particles[i].velocity = (particles[i].velocity / speed) * maxSpeed;
+            }
+        }
 
-            p.position += p.velocity * Time.deltaTime;
+        // Update positions and resolve collisions
+        for (int i = 0; i < particles.Count; i++)
+        {
+            particles[i].position += particles[i].velocity * Time.deltaTime;
+            ResolveCollisions(particles[i]);
+        }
 
-            ResolveCollisions(p);
+    }
+
+    void InitializeSpatialHashing()
+    {
+        spatialLookup = new SpatialEntry[numParticles];
+        startIndices = new int[numParticles];
+        predictedPositions = new Vector2[numParticles];
+    }
+
+    void UpdateSpatialLookup(Vector2[] positions)
+    {
+        // Create spatial lookup entries
+        for (int i = 0; i < particles.Count; i++)
+        {
+            (int cellX, int cellY) = PositionToCellCoord(positions[i], smoothingRadius);
+            uint cellKey = GetKeyFromHash(HashCell(cellX, cellY));
+            
+            spatialLookup[i] = new SpatialEntry
+            {
+                particleIndex = i,
+                cellKey = cellKey
+            };
+            startIndices[i] = int.MaxValue;
+        }
+
+        // Sort by cell key
+        Array.Sort(spatialLookup, (a, b) => a.cellKey.CompareTo(b.cellKey));
+
+        // Calculate start indices for each unique cell
+        for (int i = 0; i < particles.Count; i++)
+        {
+            uint key = spatialLookup[i].cellKey;
+            uint keyPrev = i == 0 ? uint.MaxValue : spatialLookup[i - 1].cellKey;
+            
+            if (key != keyPrev)
+            {
+                startIndices[key] = i;
+            }
+        }
+    }
+
+    (int, int) PositionToCellCoord(Vector2 position, float radius)
+    {
+        int cellX = (int)(position.x / radius);
+        int cellY = (int)(position.y / radius);
+        return (cellX, cellY);
+    }
+
+    uint HashCell(int cellX, int cellY)
+    {
+        uint a = (uint)cellX * 15823;
+        uint b = (uint)cellY * 9737333;
+        return a + b;
+    }
+
+    uint GetKeyFromHash(uint hash)
+    {
+        return hash % (uint)numParticles;
+    }
+
+    void ForeachPointWithinRadius(Vector2 samplePoint, System.Action<int> callback)
+    {
+        (int centreX, int centreY) = PositionToCellCoord(samplePoint, smoothingRadius);
+        float sqrRadius = smoothingRadius * smoothingRadius;
+
+        for (int i = 0; i < cellOffsets.Length; i += 2)
+        {
+            int offsetX = cellOffsets[i];
+            int offsetY = cellOffsets[i + 1];
+            
+            uint key = GetKeyFromHash(HashCell(centreX + offsetX, centreY + offsetY));
+            int cellStartIndex = startIndices[key];
+
+            // Skip if cell is empty (CRITICAL FIX!)
+            if (cellStartIndex == int.MaxValue) continue;
+
+            for (int j = cellStartIndex; j < spatialLookup.Length; j++)
+            {
+                if (spatialLookup[j].cellKey != key) break;
+
+                int particleIndex = spatialLookup[j].particleIndex;
+                
+                // Use predicted positions! (CRITICAL FIX!)
+                float sqrDst = (predictedPositions[particleIndex] - samplePoint).sqrMagnitude;
+
+                if (sqrDst <= sqrRadius)
+                {
+                    callback(particleIndex);
+                }
+            }
         }
     }
 
@@ -163,18 +293,18 @@ public class SPHSolver : MonoBehaviour
 
     void CalculateDensities()
     {
-        foreach (var pA in particles)
+        for (int i = 0; i < particles.Count; i++)
         {
             float density = 0f;
 
-            foreach(var pB in particles)
+            ForeachPointWithinRadius(predictedPositions[i], (particleIndex) =>
             {
-                float distance = Vector2.Distance(pA.position, pB.position);
+                float distance = Vector2.Distance(predictedPositions[i], predictedPositions[particleIndex]);
                 float influence = SmoothingKernel(smoothingRadius, distance);
                 density += particleMass * influence;
-            }
+            });
             
-            pA.density = density;
+            particles[i].density = Mathf.Max(density, 0.0001f);
         }
     }
 
@@ -193,52 +323,70 @@ public class SPHSolver : MonoBehaviour
         float scale = 12 / (Mathf.Pow(radius, 4) * Mathf.PI);
         return (distance - radius) * scale;
     }
-
-    float CalculateProperty(Vector2 samplePoint, System.Func<FluidParticle, float> getter)
+    
+    float ViscosityKernel(float radius, float distance)
     {
-        float property = 0;
-
-        foreach(var p in particles)
-        {
-            float distance = (p.position - samplePoint).magnitude;
-            float influence = SmoothingKernel(smoothingRadius, distance);
-            float density = p.density;
-            if (density > 0)
-            {
-                property += getter(p) * influence * particleMass / density;
-            }
-        }
-
-        return property;
+        if (distance >= radius) return 0f;
+        
+        float v = radius * radius - distance * distance;
+        float volume = (Mathf.PI * Mathf.Pow(radius, 6)) / 32f;
+        return v * v * v / volume;
     }
 
-    Vector2 CalculatePressureForce(FluidParticle p)
+    Vector2 CalculatePressureForce(int particleIndex)
     {
         Vector2 pressureForce = Vector2.zero;
+        FluidParticle particle = particles[particleIndex];
 
-        foreach (var otherParticle in particles)
+        ForeachPointWithinRadius(predictedPositions[particleIndex], (otherIndex) =>
         {
-            if (p == otherParticle) continue;  // Skip self
+            if (particleIndex == otherIndex) return;
         
-            float distance = Vector2.Distance(p.position, otherParticle.position);
+            Vector2 offset = predictedPositions[otherIndex] - predictedPositions[particleIndex];
+            float distance = offset.magnitude;
 
-            if (distance > 0 && otherParticle.density > 0)
+            if (distance < 0.0001f)
             {
-                Vector2 direction = (otherParticle.position - p.position) / distance;
+                offset = UnityEngine.Random.insideUnitCircle.normalized * 0.0001f;
+                distance = 0.0001f;
+            }
+            
+            Vector2 direction = offset / distance;
+
+            if (particles[otherIndex].density > 0)
+            {
                 float slope = SmoothingKernelDerivative(smoothingRadius, distance);
+                float pressure = ConvertDensityToPressure(particle.density);
+                float otherPressure = ConvertDensityToPressure(particles[otherIndex].density);
+                float sharedPressure = (pressure + otherPressure) / 2f;
                 
-                // Use SHARED pressure between the two particles
-                float sharedPressure = (ConvertDensityToPressure(p.density) + ConvertDensityToPressure(otherParticle.density)) / 2f;
-                
-                pressureForce += sharedPressure * direction * slope * particleMass / otherParticle.density;
+           
+                pressureForce += direction * (sharedPressure * slope) * particleMass / particles[otherIndex].density;
             }
-            else if(distance == 0)
-            {
-                Vector2 dirrection = UnityEngine.Random.insideUnitCircle.normalized;
-                pressureForce += dirrection * 0.0001f;
-            }
-        }
+        });
         return pressureForce;
+    }
+    Vector2 CalculateViscosityForce(int particleIndex)
+    {
+        Vector2 viscosityForce = Vector2.zero;
+        FluidParticle particle = particles[particleIndex];
+
+        ForeachPointWithinRadius(predictedPositions[particleIndex], (otherIndex) =>
+        {
+            if (particleIndex == otherIndex) return;
+            
+            float distance = Vector2.Distance(predictedPositions[particleIndex], predictedPositions[otherIndex]);
+            
+            if (distance > 0.0001f)
+            {
+                float influence = ViscosityKernel(smoothingRadius, distance);
+                Vector2 velocityDiff = particles[otherIndex].velocity - particle.velocity;
+                
+                viscosityForce += velocityDiff * influence * viscosityStrength;
+            }
+        });
+
+        return viscosityForce;
     }
 
     float ConvertDensityToPressure(float density)

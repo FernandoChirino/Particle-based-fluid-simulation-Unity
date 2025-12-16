@@ -1,5 +1,7 @@
 using UnityEngine;
 using UnityEditor;
+using UnityEngine.Rendering;
+using System.Runtime.CompilerServices;
 
 public class FluidParticle : MonoBehaviour
 {
@@ -8,24 +10,26 @@ public class FluidParticle : MonoBehaviour
     public float density;
     public float pressure; 
     public float mass;
-    
-
     public Vector2 position
     {
         get => transform.position;
         set => transform.position = value;
     }
+    private SpriteRenderer sr;
 
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
+
     void Start()
     {
         position = transform.position; 
+        sr = GetComponent<SpriteRenderer>();
     }
 
     // Update is called once per frame
     void Update()
     {
-        
+        float speed = velocity.magnitude;
+        sr.color = Color.Lerp(Color.blue, Color.red, speed / 10);
+
     }
 
     // void OnDrawGizmos()
