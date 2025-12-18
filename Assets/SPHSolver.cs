@@ -4,6 +4,7 @@ using Vector2 = UnityEngine.Vector2;
 using Vector3 = UnityEngine.Vector3;
 using Quaternion = UnityEngine.Quaternion;
 using System;
+using UnityEngine.InputSystem;
 
 public class SPHSolver : MonoBehaviour
 {
@@ -27,6 +28,10 @@ public class SPHSolver : MonoBehaviour
     public float particleSpacing;
     public float maxSpeed = 10f;
     private List<FluidParticle> particles = new List<FluidParticle>(); // Dynamic list 
+
+    [Header("Interaction")]
+    public float interactionRadius;
+    public float interactionStrength;
 
     private struct SpatialEntry
     {
@@ -52,6 +57,8 @@ public class SPHSolver : MonoBehaviour
 
     public static SPHSolver Instance;
 
+    private Camera mainCamera; 
+
     void Awake()
     {
         // -- Created the GameObject for visualizing the collision box --
@@ -70,6 +77,7 @@ public class SPHSolver : MonoBehaviour
 
     void Start()
     {
+        mainCamera = Camera.main; 
         SpawnInitialParticles();
         InitializeSpatialHashing();
     }
@@ -77,6 +85,7 @@ public class SPHSolver : MonoBehaviour
     void Update()
     {
 
+        HandleMouseInteraction(Time.deltaTime);
         // Apply gravity and predict next positions (look ahead)
         for (int i = 0; i < particles.Count; i++)
         {
@@ -87,6 +96,8 @@ public class SPHSolver : MonoBehaviour
 
         // Update spatial lookup with predicted positions
         UpdateSpatialLookup(predictedPositions);
+        
+        
 
         // Calculate densities using predicted positions
         CalculateDensities();
@@ -262,7 +273,7 @@ public class SPHSolver : MonoBehaviour
         // Limits & apply collision damping 
         if (Mathf.Abs(pos.x) > halfBoundsSize.x)
         {   
-            Debug.Log($"X Collision! pos.x={pos.x}, halfBounds={halfBoundsSize.x}");
+            //Debug.Log($"X Collision! pos.x={pos.x}, halfBounds={halfBoundsSize.x}");
             pos.x = Math.Clamp(pos.x, -halfBoundsSize.x, halfBoundsSize.x);
             vel.x *= -1 * CollisionDamping;
         }
@@ -394,6 +405,81 @@ public class SPHSolver : MonoBehaviour
         float densityErr = density - targetDensity;
         float pressure = densityErr * pressureMultiplier;
         return pressure;
+    }
+
+    void HandleMouseInteraction(float deltaTime)
+    {
+        var mouse = Mouse.current;
+        // Left mouse button - attract particles
+        if (mouse.leftButton.isPressed)
+        {
+            Vector2 mouseScreenPos = mouse.position.ReadValue();
+            Vector3 mouseWorldPos = mainCamera.ScreenToWorldPoint(new Vector3(mouseScreenPos.x, mouseScreenPos.y, 0));
+            Vector2 mousePos2D = new Vector2(mouseWorldPos.x, mouseWorldPos.y);
+            
+            ApplyInteractionForce(mousePos2D, interactionStrength, deltaTime);
+        }
+        
+        // Right mouse button - repel particles
+        if (mouse.rightButton.isPressed)
+        {
+            Vector2 mouseScreenPos = mouse.position.ReadValue();
+            Vector3 mouseWorldPos = mainCamera.ScreenToWorldPoint(new Vector3(mouseScreenPos.x, mouseScreenPos.y, 0));
+            Vector2 mousePos2D = new Vector2(mouseWorldPos.x, mouseWorldPos.y);
+            
+            ApplyInteractionForce(mousePos2D, -interactionStrength, deltaTime);
+        }
+    }
+
+    void ApplyInteractionForce(Vector2 interactionPoint, float strength, float deltaTime)
+    {
+        int affectedCount = 0;
+        
+        // Calculate how many cells we need to check based on interaction radius
+        int cellRadius = Mathf.CeilToInt(interactionRadius / smoothingRadius);
+        float sqrRadius = interactionRadius * interactionRadius;
+        
+        (int centreX, int centreY) = PositionToCellCoord(interactionPoint, smoothingRadius);
+
+        // Check all cells in a square around the center
+        for (int x = -cellRadius; x <= cellRadius; x++)
+        {
+            for (int y = -cellRadius; y <= cellRadius; y++)
+            {
+                uint key = GetKeyFromHash(HashCell(centreX + x, centreY + y));
+                int cellStartIndex = startIndices[key];
+
+                if (cellStartIndex == int.MaxValue) continue;
+
+                for (int j = cellStartIndex; j < particles.Count; j++)
+                {
+                    if (spatialLookup[j].cellKey != key) break;
+
+                    int particleIndex = spatialLookup[j].particleIndex;
+                    Vector2 offset = particles[particleIndex].position - interactionPoint;
+                    float sqrDst = offset.sqrMagnitude;
+
+                    if (sqrDst <= sqrRadius)
+                    {
+                        if (sqrDst < 0.0001f) sqrDst = 0.0001f;
+                        
+                        float distance = Mathf.Sqrt(sqrDst);
+                        Vector2 direction = offset / distance;
+                        
+                        // Stronger falloff
+                        float falloff = (interactionRadius - distance) / interactionRadius;
+                        falloff = falloff * falloff;
+                        
+                        Vector2 force = direction * strength * falloff;
+                        
+                        particles[particleIndex].velocity += force * deltaTime;
+                        affectedCount++;
+                    }
+                }
+            }
+        }
+        
+        Debug.Log($"Affected {affectedCount} particles at {interactionPoint}");
     }
 
     void OnDrawGizmos()

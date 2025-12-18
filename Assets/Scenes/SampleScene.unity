@@ -241,7 +241,7 @@ MonoBehaviour:
   gravitiy: 10
   smoothingRadius: 1.5
   targetDensity: 2
-  pressureMultiplier: 110
+  pressureMultiplier: 250
   viscosityStrength: 0.8
   BoundsSize: {x: 40, y: 35}
   CollisionDamping: 0.1
@@ -250,6 +250,8 @@ MonoBehaviour:
   particleRadius: 0.2
   particleSpacing: 0.2
   maxSpeed: 10
+  interactionRadius: 4
+  interactionStrength: 500
 --- !u!4 &1062462780
 Transform:
   m_ObjectHideFlags: 0
@@ -279,7 +281,7 @@ GameObject:
   - component: {fileID: 1533733930}
   m_Layer: 0
   m_Name: Camera
-  m_TagString: Untagged
+  m_TagString: MainCamera
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
